@@ -1,0 +1,2 @@
+2025-08-01 16:13:12 [INFO] [业务错误] User already exists
+2025-08-01 16:13:12 [INFO] ::1 - - [01/Aug/2025:08:13:12 +0000] "POST /api/auth/register HTTP/1.1" 200 59 "-" "PostmanRuntime/7.44.1"
