@@ -1,3 +1,5 @@
 .env*
 node_modules
 dist
+node全栈开发能力.md
+logs/*
