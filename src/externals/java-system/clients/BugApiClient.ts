@@ -2,8 +2,10 @@ import axios, {
   AxiosError,
   AxiosInstance,
   InternalAxiosRequestConfig,
+  AxiosResponse,
 } from 'axios';
 import { generateSignature } from '../utils/signature';
+import { ExternalErrorHandler } from '../utils/externalErrorHandler';
 
 /**
  * Java主系统Bug API客户端
@@ -27,6 +29,8 @@ class BugApiClient {
 
     // 添加请求拦截器，自动添加签名头
     this.setupRequestInterceptor();
+    // 添加响应拦截器，统一处理错误
+    this.setupResponseInterceptor();
   }
 
   private setupRequestInterceptor() {
@@ -66,6 +70,66 @@ class BugApiClient {
         return Promise.reject(error);
       }
     );
+  }
+
+  private setupResponseInterceptor() {
+    this.client.interceptors.response.use(
+      (response: AxiosResponse) => {
+        // 成功响应直接返回
+        return response;
+      },
+      (error: AxiosError) => {
+        // 根据请求路径和方法确定操作类型
+        const operation = this.getOperationFromRequest(error.config);
+        
+        // 统一处理错误
+        const standardizedError = ExternalErrorHandler.handle(error, {
+          service: 'Java主系统',
+          operation,
+          requestData: error.config?.data
+        });
+        
+        // 返回Promise.reject，让上层能够捕获到标准化的错误
+        return Promise.reject(standardizedError);
+      }
+    );
+  }
+
+  /**
+   * 根据请求配置确定操作类型
+   */
+  private getOperationFromRequest(config?: InternalAxiosRequestConfig): string {
+    if (!config) return '未知操作';
+    
+    const method = config.method?.toUpperCase();
+    const url = config.url || '';
+    
+    // 根据URL和方法确定具体操作
+    if (url.includes('/bugs/getbugs')) {
+      return '获取bugs列表';
+    } else if (url.includes('/bugs/batch/resolve')) {
+      return '批量标记bug已解决';
+    } else if (url.match(/\/bugs\/[^/]+\/resolve$/)) {
+      return '标记bug已解决';
+    } else if (url.match(/\/bugs\/[^/]+$/)) {
+      if (method === 'GET') {
+        return '获取bug详情';
+      }
+    }
+    
+    // 默认根据方法返回通用操作名
+    switch (method) {
+      case 'GET':
+        return '获取数据';
+      case 'POST':
+        return '创建/提交数据';
+      case 'PUT':
+        return '更新数据';
+      case 'DELETE':
+        return '删除数据';
+      default:
+        return '执行操作';
+    }
   }
 
   /**
