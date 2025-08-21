@@ -46,7 +46,14 @@ export const getJavaBugService = () => {
   return JavaSystemIntegration.getInstance().getBugService();
 };
 
-// 导出类型
+// 导出类型和同步相关模块
 export * from './services/BugService';
 export { default as BugService } from './services/BugService';
 export { default as BugApiClient } from './clients/BugApiClient';
+
+// 导出同步策略
+export * from './sync/SyncManager';
+export * from './sync/PollingSync';
+export * from './sync/WebHookSync';
+export * from './sync/IncrementalSync';
+export * from './sync/BugSyncManager';
