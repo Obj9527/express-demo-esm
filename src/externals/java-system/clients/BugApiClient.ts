@@ -37,7 +37,7 @@ class BugApiClient {
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         const timestamp = Date.now().toString();
-        const method = config.method?.toUpperCase() || 'GET';
+        const method = config.method?.toUpperCase() || 'POST';
         const path = config.url || '';
 
         // 获取请求体，GET 请求没有 body
@@ -81,14 +81,14 @@ class BugApiClient {
       (error: AxiosError) => {
         // 根据请求路径和方法确定操作类型
         const operation = this.getOperationFromRequest(error.config);
-        
+
         // 统一处理错误
         const standardizedError = ExternalErrorHandler.handle(error, {
           service: 'Java主系统',
           operation,
-          requestData: error.config?.data
+          requestData: error.config?.data,
         });
-        
+
         // 返回Promise.reject，让上层能够捕获到标准化的错误
         return Promise.reject(standardizedError);
       }
@@ -100,10 +100,10 @@ class BugApiClient {
    */
   private getOperationFromRequest(config?: InternalAxiosRequestConfig): string {
     if (!config) return '未知操作';
-    
+
     const method = config.method?.toUpperCase();
     const url = config.url || '';
-    
+
     // 根据URL和方法确定具体操作
     if (url.includes('/bugs/getbugs')) {
       return '获取bugs列表';
@@ -116,7 +116,7 @@ class BugApiClient {
         return '获取bug详情';
       }
     }
-    
+
     // 默认根据方法返回通用操作名
     switch (method) {
       case 'GET':
