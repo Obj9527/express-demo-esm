@@ -1,8 +1,14 @@
 import logger from '../utils/logger.js';
 import { BusinessError } from '../utils/error.js';
 import * as Sentry from '@sentry/node';
+import { NextFunction, Request, Response } from 'express';
 
-export function errorHandler(err, req, res, next) {
+export function errorHandler(
+  err: Error,
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
   if (err instanceof BusinessError) {
     // 业务错误
     logger.info(`[业务错误] ${err.message}`);
