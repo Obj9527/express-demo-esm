@@ -1,64 +1,66 @@
-import { In, Repository } from 'typeorm'
-import { AppDataSource } from '../config/database'
-import { Role } from '../entity/Role'
-import { RolePermission } from '../entity/RolePermission'
+import {DataSource, In, Repository} from 'typeorm';
+import { databaseManager } from '../config/database';
+import { Role } from '../entity/Role';
+import { RolePermission } from '../entity/RolePermission';
 
 export class RoleService {
-  private roleRepository: Repository<Role>
-  private rolePermissionRepository: Repository<RolePermission>
+  private roleRepository: Repository<Role>;
+  private rolePermissionRepository: Repository<RolePermission>;
+  private AppDataSource: DataSource;
 
   constructor() {
-    this.roleRepository = AppDataSource.getRepository(Role)
-    this.rolePermissionRepository = AppDataSource.getRepository(RolePermission)
+    this.AppDataSource = databaseManager.getMysqlInstance();
+    this.roleRepository = this.AppDataSource.getRepository(Role);
+    this.rolePermissionRepository = this.AppDataSource.getRepository(RolePermission);
   }
 
   /**
    * 创建角色
    */
-  async create(data: { name: string; desc?: string }) {
+  async create(data: { name: string; desc: string | null }) {
     // 检查角色名是否已存在
     const existingRole = await this.roleRepository.findOne({
-      where: { name: data.name }
-    })
+      where: { name: data.name },
+    });
 
     if (existingRole) {
-      throw new Error('Role name already exists')
+      throw new Error('Role name already exists');
     }
 
-    const role = new Role()
-    role.name = data.name
-    role.desc = data.desc
+    const role = new Role();
+    role.name = data.name;
+    role.desc = data.desc;
 
-    return await this.roleRepository.save(role)
+    return await this.roleRepository.save(role);
   }
 
   /**
    * 更新角色
    */
   async update(id: number, data: { name?: string; desc?: string }) {
-    const role = await this.roleRepository.findOneBy({ id })
-    
+    const role = await this.roleRepository.findOneBy({ id });
+
     if (!role) {
-      throw new Error('Role not found')
+      throw new Error('Role not found');
     }
 
     // 如果要更新名称，检查新名称是否与其他角色冲突
     if (data.name && data.name !== role.name) {
       const existingRole = await this.roleRepository.findOne({
-        where: { name: data.name }
-      })
+        where: { name: data.name },
+      });
 
       if (existingRole) {
-        throw new Error('Role name already exists')
+        throw new Error('Role name already exists');
       }
-      role.name = data.name
+      role.name = data.name;
     }
 
     if (data.desc !== undefined) {
-      role.desc = data.desc
+      role.desc = data.desc;
     }
 
-    return await this.roleRepository.save(role)
+    return await this.roleRepository.save(role);
   }
 
   /**
@@ -67,22 +69,22 @@ export class RoleService {
   async delete(id: number) {
     const role = await this.roleRepository.findOne({
       where: { id },
-      relations: ['users', 'permissions']
-    })
+      relations: ['users', 'permissions'],
+    });
 
     if (!role) {
-      throw new Error('Role not found')
+      throw new Error('Role not found');
     }
 
     // 使用事务确保数据一致性
-    await AppDataSource.transaction(async manager => {
+    await this.AppDataSource.transaction(async (manager) => {
       // 先删除关联的权限关系
-      await manager.delete(RolePermission, { roleId: id })
+      await manager.delete(RolePermission, { roleId: id });
       // 再删除角色
-      await manager.delete(Role, { id })
-    })
+      await manager.delete(Role, { id });
+    });
 
-    return true
+    return true;
   }
 
   /**
@@ -91,54 +93,54 @@ export class RoleService {
   async findById(id: number, options?: { withPermissions?: boolean }) {
     const queryBuilder = this.roleRepository
       .createQueryBuilder('role')
-      .where('role.id = :id', { id })
+      .where('role.id = :id', { id });
 
     if (options?.withPermissions) {
       queryBuilder
         .leftJoinAndSelect('role.permissions', 'rolePermission')
-        .leftJoinAndSelect('rolePermission.permission', 'permission')
+        .leftJoinAndSelect('rolePermission.permission', 'permission');
     }
 
-    const role = await queryBuilder.getOne()
+    const role = await queryBuilder.getOne();
 
     if (!role) {
-      throw new Error('Role not found')
+      throw new Error('Role not found');
     }
 
-    return role
+    return role;
   }
 
   /**
    * 获取角色列表
    */
   async findAll(options?: {
-    page?: number
-    pageSize?: number
-    withPermissions?: boolean
+    page?: number;
+    pageSize?: number;
+    withPermissions?: boolean;
   }) {
-    const page = options?.page || 1
-    const pageSize = options?.pageSize || 10
+    const page = options?.page || 1;
+    const pageSize = options?.pageSize || 10;
 
     const queryBuilder = this.roleRepository
       .createQueryBuilder('role')
       .skip((page - 1) * pageSize)
-      .take(pageSize)
+      .take(pageSize);
 
     if (options?.withPermissions) {
       queryBuilder
         .leftJoinAndSelect('role.permissions', 'rolePermission')
-        .leftJoinAndSelect('rolePermission.permission', 'permission')
+        .leftJoinAndSelect('rolePermission.permission', 'permission');
     }
 
-    const [roles, total] = await queryBuilder.getManyAndCount()
+    const [roles, total] = await queryBuilder.getManyAndCount();
 
     return {
       items: roles,
       total,
       page,
       pageSize,
-      totalPages: Math.ceil(total / pageSize)
-    }
+      totalPages: Math.ceil(total / pageSize),
+    };
   }
 
   /**
@@ -148,15 +150,15 @@ export class RoleService {
     return await this.roleRepository
       .createQueryBuilder('role')
       .where('role.name LIKE :name', { name: `%${name}%` })
-      .getMany()
+      .getMany();
   }
 
   /**
    * 检查角色是否存在
    */
   async exists(id: number): Promise<boolean> {
-    const count = await this.roleRepository.countBy({ id })
-    return count > 0
+    const count = await this.roleRepository.countBy({ id });
+    return count > 0;
   }
 
   /**
@@ -164,80 +166,82 @@ export class RoleService {
    */
   async assignPermissions(roleId: number, permissionIds: number[]) {
     // 检查角色是否存在
-    const role = await this.roleRepository.findOneBy({ id: roleId })
+    const role = await this.roleRepository.findOneBy({ id: roleId });
     if (!role) {
-      throw new Error('Role not found')
+      throw new Error('Role not found');
     }
 
     // 使用事务确保数据一致性
-    await AppDataSource.transaction(async manager => {
+    await this.AppDataSource.transaction(async (manager) => {
       // 先删除现有的权限关联
-      await manager.delete(RolePermission, { roleId })
+      await manager.delete(RolePermission, { roleId });
 
       // 创建新的权限关联
-      const rolePermissions = permissionIds.map(permissionId => {
-        const rp = new RolePermission()
-        rp.roleId = roleId
-        rp.permissionId = permissionId
-        return rp
-      })
+      const rolePermissions = permissionIds.map((permissionId) => {
+        const rp = new RolePermission();
+        rp.roleId = roleId;
+        rp.permissionId = permissionId;
+        return rp;
+      });
 
-      await manager.save(RolePermission, rolePermissions)
-    })
+      await manager.save(RolePermission, rolePermissions);
+    });
 
-    return await this.findById(roleId, { withPermissions: true })
+    return await this.findById(roleId, { withPermissions: true });
   }
 
   /**
    * 添加角色权限（保留现有权限）
    */
   async addPermissions(roleId: number, permissionIds: number[]) {
-    const role = await this.roleRepository.findOneBy({ id: roleId })
+    const role = await this.roleRepository.findOneBy({ id: roleId });
     if (!role) {
-      throw new Error('Role not found')
+      throw new Error('Role not found');
     }
 
     // 获取现有的权限ID列表
     const existingPermissions = await this.rolePermissionRepository.find({
-      where: { roleId }
-    })
-    const existingPermissionIds = existingPermissions.map(rp => rp.permissionId)
+      where: { roleId },
+    });
+    const existingPermissionIds = existingPermissions.map(
+      (rp) => rp.permissionId
+    );
 
     // 过滤出新的权限ID（避免重复添加）
     const newPermissionIds = permissionIds.filter(
-      id => !existingPermissionIds.includes(id)
-    )
+      (id) => !existingPermissionIds.includes(id)
+    );
 
     // 如果有新的权限需要添加
     if (newPermissionIds.length > 0) {
-      const rolePermissions = newPermissionIds.map(permissionId => {
-        const rp = new RolePermission()
-        rp.roleId = roleId
-        rp.permissionId = permissionId
-        return rp
-      })
+      const rolePermissions = newPermissionIds.map((permissionId) => {
+        const rp = new RolePermission();
+        rp.roleId = roleId;
+        rp.permissionId = permissionId;
+        return rp;
+      });
 
-      await this.rolePermissionRepository.save(rolePermissions)
+      await this.rolePermissionRepository.save(rolePermissions);
     }
 
-    return await this.findById(roleId, { withPermissions: true })
+    return await this.findById(roleId, { withPermissions: true });
   }
 
   /**
    * 移除角色权限
    */
   async removePermissions(roleId: number, permissionIds: number[]) {
-    const role = await this.roleRepository.findOneBy({ id: roleId })
+    const role = await this.roleRepository.findOneBy({ id: roleId });
     if (!role) {
-      throw new Error('Role not found')
+      throw new Error('Role not found');
     }
 
     await this.rolePermissionRepository.delete({
       roleId,
-      permissionId: In(permissionIds)
-    })
+      permissionId: In(permissionIds),
+    });
 
-    return await this.findById(roleId, { withPermissions: true })
+    return await this.findById(roleId, { withPermissions: true });
   }
 
   /**
@@ -248,15 +252,15 @@ export class RoleService {
       where: { id: roleId },
       relations: {
         permissions: {
-          permission: true
-        }
-      }
-    })
+          permission: true,
+        },
+      },
+    });
 
     if (!role) {
-      throw new Error('Role not found')
+      throw new Error('Role not found');
     }
 
-    return role.permissions.map(rp => rp.permission)
+    return role.permissions.map((rp) => rp.permission);
   }
 }

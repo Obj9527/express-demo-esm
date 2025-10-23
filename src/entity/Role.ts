@@ -1,28 +1,34 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from "typeorm"
-import { UserRole } from "./UserRole"
-import { RolePermission } from "./RolePermission"
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  OneToMany,
+} from 'typeorm';
+import { UserRole } from './UserRole';
+import { RolePermission } from './RolePermission';
 
-@Entity("roles")
+@Entity('roles')
 export class Role {
   @PrimaryGeneratedColumn()
-  id!: number
+  id!: number;
 
   @Column({ unique: true })
-  name!: string
+  name!: string;
 
-  @Column({ nullable: true })
-  desc!: string | undefined
+  @Column({ nullable: true, type: 'varchar', length: 255 })
+  desc!: string | null;
 
   @CreateDateColumn()
-  createdAt!: Date
+  createdAt!: Date;
 
-  @OneToMany(() => UserRole, userRole => userRole.role, {
-    createForeignKeyConstraints: false
+  @OneToMany(() => UserRole, (userRole) => userRole.role, {
+    createForeignKeyConstraints: false,
   })
-  users!: UserRole[]
+  users!: UserRole[];
 
-  @OneToMany(() => RolePermission, rolePermission => rolePermission.role, {
-    createForeignKeyConstraints: false
+  @OneToMany(() => RolePermission, (rolePermission) => rolePermission.role, {
+    createForeignKeyConstraints: false,
   })
-  permissions!: RolePermission[]
+  permissions!: RolePermission[];
 }

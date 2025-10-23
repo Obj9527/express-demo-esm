@@ -1,15 +1,11 @@
 import 'reflect-metadata';
 import express from 'express';
-import { AppDataSource } from './config/database';
-import bugSyncRoutes from './routes/bugSync';
-import bugRoutes from './routes/bug';
-import { BugSyncController } from './controllers/bugSyncController';
+import { databaseManager } from './config/database';
 import logger from './utils/logger';
 import { httpLogger } from './utils/httpLogger';
 import userRoutes from './routes/user';
 import authRoutes from './routes/auth';
 import { errorHandler } from './middleware/errorHandlerMiddleware';
-import { connectMongoDB } from './db';
 
 const app = express();
 // 放在所有中间件最前面，记录所有请求日志
@@ -33,9 +29,7 @@ app.use(errorHandler);
 async function initApp() {
   try {
     // 1. 初始化数据库连接
-    await connectMongoDB();
-    await AppDataSource.initialize();
-    logger.info('✅ pg数据库连接成功');
+    await databaseManager.connect();
 
     const PORT = process.env.PORT || 3000;
 
@@ -63,12 +57,9 @@ process.on('SIGTERM', async () => {
   logger.info('📴 接收到终止信号，开始优雅关闭...');
 
   try {
-    // 停止Bug同步服务
-    // await bugSyncController.cleanup();
-
     // 关闭数据库连接
-    if (AppDataSource.isInitialized) {
-      await AppDataSource.destroy();
+    if (databaseManager.isInitialized()) {
+      await databaseManager.close();
       logger.info('🔌 数据库连接已关闭');
     }
 
